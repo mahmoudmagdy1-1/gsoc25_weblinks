@@ -18,7 +18,8 @@ RUN apt-get update && \
     a2enmod rewrite && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
+RUN echo "export APACHE_DOCUMENT_ROOT=/var/www/html/public" >> /etc/apache2/envvars && \
+sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf && \
+a2enmod rewrite
 
 EXPOSE 80 3306
