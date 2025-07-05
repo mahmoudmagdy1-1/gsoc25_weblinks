@@ -16,10 +16,10 @@ RUN apt-get update && \
     apt-get install -y nodejs && \
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
     a2enmod rewrite && \
+    mkdir -p /var/www/html/public
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
-RUN echo "export APACHE_DOCUMENT_ROOT=/var/www/html/public" >> /etc/apache2/envvars && \
-sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf && \
-a2enmod rewrite
+ENV APACHE_DOCUMENT_ROOT /var/www/html/public
+RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
 
 EXPOSE 80 3306
