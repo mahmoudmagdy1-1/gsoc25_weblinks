@@ -11,7 +11,7 @@
         "bmewburn.vscode-intelephense-client",
         "esbenp.prettier-vscode"
     ],
-    "postCreateCommand": "composer install || true && npm install || true",
+    "postCreateCommand": "mkdir -p /var/www/html/public && composer install || true && npm install || true",
     "forwardPorts": [80, 3306],
     "portsAttributes": {
         "80": {
