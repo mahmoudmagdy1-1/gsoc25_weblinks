@@ -72,8 +72,8 @@ echo "--> Setting Joomla to debug mode..."
 # Use php -d to disable error reporting for this specific command to prevent warnings
 php -d error_reporting=0 $JOOMLA_ROOT/cli/joomla.php config:set debug=true error_reporting=maximum
 
-WEBLINKS_PATH="/workspaces/weblinks"
-WEBLINKS_PKG_PATH="/workspaces/weblinks/dist/pkg-weblinks-current.zip"
+WEBLINKS_PATH="/workspaces/gsoc25_weblinks"
+WEBLINKS_PKG_PATH="/workspaces/gsoc25_weblinks/dist/pkg-weblinks-current.zip"
 echo "--> Installing Weblinks extension from $WEBLINKS_PKG_PATH..."
 if [ -f "$WEBLINKS_PKG_PATH" ]; then
     php $JOOMLA_ROOT/cli/joomla.php extension:install --path="$WEBLINKS_PKG_PATH"
@@ -112,7 +112,7 @@ a2ensite joomla.conf phpmyadmin.conf
 service apache2 restart
 
 # --- 8. Display and Save Login Credentials ---
-CREDENTIALS_FILE="/workspaces/weblinks/login-credentials.txt"
+CREDENTIALS_FILE="/workspaces/gsoc25_weblinks/login-credentials.txt"
 # Use tee to write to both the file and stdout (the terminal)
 {
     echo ""
