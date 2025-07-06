@@ -1,24 +1,31 @@
+# Start from the official PHP 8.2 image with Apache
 FROM php:8.2-apache
 
-RUN apt-get update && \
-    apt-get install -y \
-        git \
-        unzip \
-        curl \
-        libpng-dev \
-        libonig-dev \
-        libxml2-dev \
-        libzip-dev \
-        default-mysql-client \
-        gnupg2 \
-        lsb-release && \
+# Install system dependencies, Node.js, and Composer
+RUN apt-get update && apt-get install -y \
+    # System tools and git
+    git \
+    unzip \
+    curl \
+    sudo \
+    # PHP extensions dependencies
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    libzip-dev \
+    # MySQL client AND server
+    default-mysql-client \
+    default-mysql-server \
+    && \
+    # Install the required PHP extensions for Zip and MySQL
+    docker-php-ext-install zip mysqli && \
+    # Install Node.js (LTS version)
     curl -fsSL https://deb.nodesource.com/setup_lts.x | bash - && \
     apt-get install -y nodejs && \
+    # Install Composer globally
     curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
+    # Enable Apache's rewrite module and set the ServerName to prevent warnings
     a2enmod rewrite && \
+    echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
+    # Clean up apt cache to reduce image size
     apt-get clean && rm -rf /var/lib/apt/lists/*
-
-ENV APACHE_DOCUMENT_ROOT /var/www/html/public
-RUN sed -ri -e 's!/var/www/html!${APACHE_DOCUMENT_ROOT}!g' /etc/apache2/sites-available/*.conf
-
-EXPOSE 80 3306
