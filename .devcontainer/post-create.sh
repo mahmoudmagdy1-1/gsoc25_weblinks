@@ -6,6 +6,11 @@ set -e
 
 echo "--- Starting Post-Creation Setup ---"
 
+# --- 0. Fix Git Permissions ---
+# Use the standard environment variable to dynamically find the workspace folder.
+echo "--> Setting safe directory for git..."
+git config --global --add safe.directory "${containerWorkspaceFolder}"
+
 # --- 1. Start and Configure MariaDB ---
 echo "--> Starting and configuring MariaDB..."
 service mariadb start
@@ -43,9 +48,11 @@ else
 fi
 
 # --- 4. Download and Install Joomla via CLI ---
-JOOMLA_ROOT="/var/www/joomla"
+# The default Apache web root is /var/www/html. We will install Joomla here.
+JOOMLA_ROOT="/var/www/html"
 echo "--> Downloading Joomla into $JOOMLA_ROOT..."
-mkdir -p $JOOMLA_ROOT
+# Clear the default index.html before downloading
+rm -f $JOOMLA_ROOT/index.html
 cd $JOOMLA_ROOT
 curl -o joomla.zip -L https://joomla.org/latest
 unzip -q joomla.zip
@@ -72,19 +79,20 @@ echo "--> Setting Joomla to debug mode..."
 # Use php -d to disable error reporting for this specific command to prevent warnings
 php -d error_reporting=0 $JOOMLA_ROOT/cli/joomla.php config:set debug=true error_reporting=maximum
 
-WEBLINKS_PATH="/workspaces/gsoc25_weblinks"
-WEBLINKS_PKG_PATH="/workspaces/gsoc25_weblinks/dist/pkg-weblinks-current.zip"
+# Use the dynamic variable for the package path
+WEBLINKS_PKG_PATH="${containerWorkspaceFolder}/dist/pkg-weblinks-current.zip"
 echo "--> Installing Weblinks extension from $WEBLINKS_PKG_PATH..."
 if [ -f "$WEBLINKS_PKG_PATH" ]; then
     php $JOOMLA_ROOT/cli/joomla.php extension:install --path="$WEBLINKS_PKG_PATH"
-    cd $WEBLINKS_PATH
+    cd $containerWorkspaceFolder
     vendor/bin/robo map /var/www/joomla
 else
     echo "Weblink package not found at $WEBLINKS_PKG_PATH. Skipping installation."
 fi
 
 # --- 6. Download and prepare phpMyAdmin ---
-PMA_ROOT="/var/www/phpmyadmin"
+# Install phpMyAdmin in a subdirectory of the main web root
+PMA_ROOT="/var/www/html/phpmyadmin"
 echo "--> Downloading phpMyAdmin into $PMA_ROOT..."
 PMA_VERSION=5.2.1
 mkdir -p $PMA_ROOT
@@ -97,22 +105,16 @@ cp $PMA_ROOT/config.sample.inc.php $PMA_ROOT/config.inc.php
 sed -i "/\['AllowNoPassword'\] = false/a \$cfg['Servers'][\$i]['host'] = '127.0.0.1';" $PMA_ROOT/config.inc.php
 sed -i "s/\['AllowNoPassword'\] = false/\['AllowNoPassword'\] = true/" $PMA_ROOT/config.inc.php
 
-# --- 7. Configure Apache and Finalize ---
-echo "--> Configuring Apache..."
-# Create a config for Joomla on port 8080
-echo -e "Listen 8080\n<VirtualHost *:8080>\n    DocumentRoot $JOOMLA_ROOT\n</VirtualHost>" | tee /etc/apache2/sites-available/joomla.conf > /dev/null
-# Create a config for phpMyAdmin on port 8090
-echo -e "Listen 8090\n<VirtualHost *:8090>\n    DocumentRoot $PMA_ROOT\n</VirtualHost>" | tee /etc/apache2/sites-available/phpmyadmin.conf > /dev/null
-
+# --- 7. Finalize Permissions and Restart Apache ---
 echo "--> Setting final file permissions..."
-chown -R www-data:www-data $JOOMLA_ROOT $PMA_ROOT
+chown -R www-data:www-data $JOOMLA_ROOT
 
-echo "--> Enabling sites and restarting Apache..."
-a2ensite joomla.conf phpmyadmin.conf
+echo "--> Restarting Apache..."
 service apache2 restart
 
 # --- 8. Display and Save Login Credentials ---
-CREDENTIALS_FILE="/workspaces/gsoc25_weblinks/login-credentials.txt"
+# Use the dynamic variable for the credentials file path
+CREDENTIALS_FILE="${containerWorkspaceFolder}/login-credentials.txt"
 # Use tee to write to both the file and stdout (the terminal)
 {
     echo ""
@@ -122,12 +124,12 @@ CREDENTIALS_FILE="/workspaces/gsoc25_weblinks/login-credentials.txt"
     echo "This information has been saved to login-credentials.txt"
     echo ""
     echo "Joomla Admin Login:"
-    echo "  URL: Open the 'Joomla Installer' port and add /administrator to the end."
+    echo "  URL: Open the 'Web Server' port and add /administrator to the end."
     echo "  Username: $ADMIN_USER"
     echo "  Password: $ADMIN_PASS"
     echo ""
     echo "phpMyAdmin Login:"
-    echo "  URL: Open the 'phpMyAdmin' port."
+    echo "  URL: Open the 'Web Server' port and add /phpmyadmin to the end."
     echo "  Username: root"
     echo "  Password: $ADMIN_PASS"
     echo "---"
