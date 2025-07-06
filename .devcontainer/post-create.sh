@@ -72,10 +72,13 @@ echo "--> Setting Joomla to debug mode..."
 # Use php -d to disable error reporting for this specific command to prevent warnings
 php -d error_reporting=0 $JOOMLA_ROOT/cli/joomla.php config:set debug=true error_reporting=maximum
 
+WEBLINKS_PATH="/workspaces/weblinks"
 WEBLINKS_PKG_PATH="/workspaces/weblinks/dist/pkg-weblinks-current.zip"
 echo "--> Installing Weblinks extension from $WEBLINKS_PKG_PATH..."
 if [ -f "$WEBLINKS_PKG_PATH" ]; then
     php $JOOMLA_ROOT/cli/joomla.php extension:install --path="$WEBLINKS_PKG_PATH"
+    cd $WEBLINKS_PATH
+    vendor/bin/robo map /var/www/joomla
 else
     echo "Weblink package not found at $WEBLINKS_PKG_PATH. Skipping installation."
 fi
