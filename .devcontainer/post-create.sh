@@ -89,8 +89,23 @@ sed -i "/\['AllowNoPassword'\] = false/a \$cfg['Servers'][\$i]['host'] = '127.0.
 sed -i "s/\['AllowNoPassword'\] = false/\['AllowNoPassword'\] = true/" $PMA_ROOT/config.inc.php
 
 # --- 7. Finalize Permissions and Restart Apache ---
+echo "--> Configuring .htaccess for Codespaces reverse proxy..."
+
+# Rename htaccess.txt to .htaccess to enable custom rules
+mv $JOOMLA_ROOT/htaccess.txt $JOOMLA_ROOT/.htaccess
+
+# Define the rules to be added
+HTACCESS_RULES="<IfModule mod_rewrite.c>\\n  RewriteEngine On\\n  RewriteCond %{HTTP:X-Forwarded-Proto} =https\\n  RewriteRule .* - [E=HTTPS:on]\\n</IfModule>"
+
+# Use sed to insert the rules at the very beginning of the .htaccess file
+sed -i "1s;^;${HTACCESS_RULES}\\n;" $JOOMLA_ROOT/.htaccess
+
+echo "--> Enabling SEF Rewrite to use .htaccess..."
+# Use the Joomla CLI to enable the 'sef_rewrite' option
+php $JOOMLA_ROOT/cli/joomla.php config:set sef_rewrite=true
+
+# Now, continue with your original permission settings
 echo "--> Setting final ownership and permissions..."
-# Set ownership of all files to the web server user
 chown -R www-data:www-data $JOOMLA_ROOT
 
 # Set standard, secure permissions for directories and files
