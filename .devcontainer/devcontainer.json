@@ -1,33 +1,22 @@
 {
-	"name": "Joomla Weblinks (Docker Compose)",
-	// Use docker-compose.yml to define the services.
-	"dockerComposeFile": "docker-compose.yml",
-	
-	// The service to open a terminal in.
-	"service": "app",
-	
-	// The folder to open in the VS Code editor.
-	"workspaceFolder": "/workspaces/weblinks",
-
-	// Forward the ports from the services to your local machine.
+	"name": "Joomla Dev Environment",
+	"build": {
+		"dockerfile": "Dockerfile"
+	},
 	"forwardPorts": [
-		80,   // Joomla app
-		8081, // phpMyAdmin
-		3306  // MySQL database
+		80,
+		3306
 	],
 	"portsAttributes": {
 		"80": {
-			"label": "Joomla (Web Server)",
+			"label": "Web Server (Joomla)",
 			"onAutoForward": "openBrowser"
 		},
-		"8081": {
-			"label": "phpMyAdmin"
+		"3306": {
+			"label": "MySQL"
 		}
 	},
-
-	// Run our custom script after the containers are created and running.
 	"postCreateCommand": "bash ./.devcontainer/post-create.sh",
-
 	"customizations": {
 		"vscode": {
 			"extensions": [
@@ -37,7 +26,5 @@
 			]
 		}
 	},
-
-	// We will connect to the 'app' container as the root user.
 	"remoteUser": "root"
 }
