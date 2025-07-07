@@ -7,15 +7,13 @@ RUN apt-get update && apt-get install -y \
     git \
     unzip \
     curl \
-    sudo \
     # PHP extensions dependencies
     libpng-dev \
     libonig-dev \
     libxml2-dev \
     libzip-dev \
-    # MySQL client AND server
+    # We only need the MySQL *client* to connect to the separate DB container
     default-mysql-client \
-    default-mysql-server \
     && \
     # Install the required PHP extensions for Zip and MySQL
     docker-php-ext-install zip mysqli && \
@@ -29,3 +27,4 @@ RUN apt-get update && apt-get install -y \
     echo "ServerName localhost" >> /etc/apache2/apache2.conf && \
     # Clean up apt cache to reduce image size
     apt-get clean && rm -rf /var/lib/apt/lists/*
+
