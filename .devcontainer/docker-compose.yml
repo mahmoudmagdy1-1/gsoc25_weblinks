@@ -1,0 +1,50 @@
+services:
+  # The Application Container (Joomla + Weblinks)
+  app:
+    # Build this container from our custom Dockerfile.
+    # Build this container from our custom Dockerfile.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Mount your local code into the container's web root.
+    volumes:
+      - ../:/workspaces/weblinks:cached
+    # The 'app' service depends on the 'db' service.
+    # This ensures the database is started before the app.
+    depends_on:
+      - db
+    # Expose port 80 for the web server.
+    ports:
+      - "80:80"
+    # Keep the container running.
+    command: service apache2 start && tail -f /dev/null
+
+  # The Database Container
+  db:
+    image: mysql:8.0
+    restart: unless-stopped
+    command: ["--default-authentication-plugin=mysql_native_password"]
+    environment:
+      MYSQL_DATABASE: test_joomla
+      MYSQL_USER: joomla_ut
+      MYSQL_PASSWORD: joomla_ut
+      MYSQL_ROOT_PASSWORD: joomla-17082005
+    # Use a named volume to persist database data.
+    volumes:
+      - db-data:/var/lib/mysql
+
+  # The phpMyAdmin Container
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8081:80"
+    environment:
+      PMA_HOST: db # Connect to the 'db' service.
+      PMA_PORT: 3306
+
+# Define the named volume for the database.
+volumes:
+  db-data:
