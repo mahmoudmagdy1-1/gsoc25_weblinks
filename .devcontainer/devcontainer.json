@@ -1,30 +1,30 @@
 {
-	"name": "Joomla Dev Environment",
-	"build": {
-		"dockerfile": "Dockerfile"
-	},
-	"forwardPorts": [
-		80,
-		3306
-	],
-	"portsAttributes": {
-		"80": {
-			"label": "Web Server (Joomla)",
-			"onAutoForward": "openBrowser"
-		},
-		"3306": {
-			"label": "MySQL"
-		}
-	},
-	"postCreateCommand": "bash ./.devcontainer/post-create.sh",
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"xdebug.php-debug",
-				"bmewburn.vscode-intelephense-client",
-				"esbenp.prettier-vscode"
-			]
-		}
-	},
-	"remoteUser": "root"
+    "name": "Joomla Dev Environment",
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "forwardPorts": [
+        80,
+        3306
+    ],
+    "portsAttributes": {
+        "80": {
+            "label": "Web Server (Joomla)",
+            "onAutoForward": "openBrowser"
+        },
+        "3306": {
+            "label": "MySQL"
+        }
+    },
+    "postCreateCommand": "bash ./.devcontainer/post-create.sh",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "xdebug.php-debug",
+                "bmewburn.vscode-intelephense-client",
+                "esbenp.prettier-vscode"
+            ]
+        }
+    },
+    "remoteUser": "root"
 }

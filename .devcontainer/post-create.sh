@@ -4,10 +4,7 @@ set -e
 
 echo "--- Starting Post-Creation Setup ---"
 
-# --- 1. Start and Configure MariaDB ---
-echo "--> Starting and configuring MariaDB..."
-service mariadb start
-
+# Configuration variables
 DB_NAME="test_joomla"
 DB_USER="joomla_ut"
 DB_PASS="joomla_ut"
@@ -16,39 +13,38 @@ ADMIN_REAL_NAME="jane doe"
 ADMIN_PASS="joomla-17082005"
 ADMIN_EMAIL="admin@example.org"
 WORKSPACE_ROOT="/workspaces/gsoc25_weblinks"
+JOOMLA_ROOT="/var/www/html"
 
-mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
-mysql -u root -e "GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost';"
-mysql -u root -e "FLUSH PRIVILEGES;"
-mysql -u root -e "SET PASSWORD FOR 'root'@'localhost' = PASSWORD('$ADMIN_PASS');"
+# --- 1. Start and Configure MariaDB ---
+echo "--> Starting and configuring MariaDB..."
+service mariadb start
 
-# --- 2. Install Project Dependencies ---
-echo "--> Installing Composer dependencies..."
+mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';
+GRANT ALL PRIVILEGES ON \`$DB_NAME\`.* TO '$DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+SET PASSWORD FOR 'root'@'localhost' = PASSWORD('$ADMIN_PASS');
+EOF
+
+# --- 2. Install Dependencies ---
+echo "--> Installing dependencies..."
 composer install --no-progress --ignore-platform-reqs
-
-echo "--> Installing NPM dependencies..."
 npm install
 
-# --- 3. Build the Weblinks Extension Package ---
-echo "--> Building the extension package via Robo..."
-if [ -f "vendor/bin/robo" ]; then
-    vendor/bin/robo build
-else
-    echo "Robo build tool not found. Skipping package build."
-fi
+# --- 3. Build Extension ---
+echo "--> Building extension..."
+[ -f "vendor/bin/robo" ] && vendor/bin/robo build || echo "Robo not found, skipping build."
 
-# --- 4. Download and Install Joomla via CLI ---
-JOOMLA_ROOT="/var/www/html"
-echo "--> Downloading Joomla into $JOOMLA_ROOT..."
+# --- 4. Install Joomla ---
+echo "--> Installing Joomla..."
 rm -f $JOOMLA_ROOT/index.html
 cd $JOOMLA_ROOT
 curl -o joomla.zip -L https://joomla.org/latest
 unzip -q joomla.zip
 rm joomla.zip
 
-echo "--> Installing Joomla via CLI..."
-php $JOOMLA_ROOT/installation/joomla.php install --verbose \
+php installation/joomla.php install \
     --site-name="Joomla CMS Test" \
     --admin-user="$ADMIN_REAL_NAME" \
     --admin-username="$ADMIN_USER" \
@@ -63,18 +59,15 @@ php $JOOMLA_ROOT/installation/joomla.php install --verbose \
     --db-encryption="0" \
     --public-folder=""
 
-# --- 5. Configure Joomla and Install Extension ---
-echo "--> Setting Joomla to debug mode..."
-php -d error_reporting=0 $JOOMLA_ROOT/cli/joomla.php config:set debug=true error_reporting=maximum
+# --- 5. Configure Joomla ---
+echo "--> Configuring Joomla..."
+php cli/joomla.php config:set debug=true error_reporting=maximum
 
-WEBLINKS_PKG_PATH="${WORKSPACE_ROOT}/dist/pkg-weblinks-current.zip"
-echo "--> Installing Weblinks extension from $WEBLINKS_PKG_PATH..."
-if [ -f "$WEBLINKS_PKG_PATH" ]; then
-    php $JOOMLA_ROOT/cli/joomla.php extension:install --path="$WEBLINKS_PKG_PATH"
-    cd $WORKSPACE_ROOT
-    vendor/bin/robo map /var/www/joomla
-else
-    echo "Weblink package not found at $WEBLINKS_PKG_PATH. Skipping installation."
+# Install extension if available
+WEBLINKS_PKG="${WORKSPACE_ROOT}/dist/pkg-weblinks-current.zip"
+if [ -f "$WEBLINKS_PKG" ]; then
+    php cli/joomla.php extension:install --path="$WEBLINKS_PKG"
+    cd $WORKSPACE_ROOT && vendor/bin/robo map /var/www/joomla
 fi
 
 # --- 6. Download and prepare phpMyAdmin ---
@@ -89,34 +82,48 @@ cp $PMA_ROOT/config.sample.inc.php $PMA_ROOT/config.inc.php
 sed -i "/\['AllowNoPassword'\] = false/a \$cfg['Servers'][\$i]['host'] = '127.0.0.1';" $PMA_ROOT/config.inc.php
 sed -i "s/\['AllowNoPassword'\] = false/\['AllowNoPassword'\] = true/" $PMA_ROOT/config.inc.php
 
-# --- 7. Finalize Permissions and Restart Apache ---
-echo "--> Setting final ownership and permissions..."
-chown -R www-data:www-data $JOOMLA_ROOT
+# --- 7. Codespaces Fix ---
+echo "--> Applying Codespaces fix..."
+PUBLIC_HOSTNAME="${CODESPACE_NAME}-80.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+echo "127.0.0.1 ${PUBLIC_HOSTNAME}" >> /etc/hosts
 
-# Set standard, secure permissions for directories and files
+# Create minimal PHP fix
+cat > $JOOMLA_ROOT/fix.php << 'EOF'
+<?php
+if (isset($_SERVER['HTTP_HOST']) && $_SERVER['HTTP_HOST'] === 'localhost:80') {
+    if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
+        $_SERVER['HTTP_HOST'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+        $_SERVER['SERVER_NAME'] = $_SERVER['HTTP_X_FORWARDED_HOST'];
+    }
+}
+EOF
+
+# Include fix in both entry points
+cp $JOOMLA_ROOT/fix.php $JOOMLA_ROOT/administrator/fix.php
+sed -i '2i require_once __DIR__ . "/fix.php";' $JOOMLA_ROOT/index.php
+sed -i '2i require_once __DIR__ . "/../fix.php";' $JOOMLA_ROOT/administrator/index.php
+
+
+# --- 8. Finalize ---
+echo "--> Finalizing setup..."
+chown -R www-data:www-data $JOOMLA_ROOT
 find $JOOMLA_ROOT -type d -exec chmod 755 {} \;
 find $JOOMLA_ROOT -type f -exec chmod 644 {} \;
-
-echo "--> Restarting Apache..."
 service apache2 restart
 
-# --- 8. Display and Save Login Credentials ---
-CREDENTIALS_FILE="${WORKSPACE_ROOT}/login-credentials.txt"
-{
-    echo ""
-    echo "---"
-    echo "✅ Setup complete! Your environment is ready."
-    echo ""
-    echo "This information has been saved to login-credentials.txt"
-    echo ""
-    echo "Joomla Admin Login:"
-    echo "  URL: Open the 'Web Server' port and add /administrator to the end."
-    echo "  Username: $ADMIN_USER"
-    echo "  Password: $ADMIN_PASS"
-    echo ""
-    echo "phpMyAdmin Login:"
-    echo "  URL: Open the 'Web Server' port and add /phpmyadmin to the end."
-    echo "  Username: root"
-    echo "  Password: $ADMIN_PASS"
-    echo "---"
-} | tee "$CREDENTIALS_FILE"
+# Save credentials
+cat > "${WORKSPACE_ROOT}/login-credentials.txt" << EOF
+✅ Setup complete!
+
+Joomla Admin:
+  URL: Open 'Web Server' port + /administrator
+  Username: $ADMIN_USER
+  Password: $ADMIN_PASS
+
+phpMyAdmin:
+  URL: Open 'Web Server' port + /phpmyadmin
+  Username: root
+  Password: $ADMIN_PASS
+EOF
+
+echo "--- Setup Complete! Check login-credentials.txt for details ---"
