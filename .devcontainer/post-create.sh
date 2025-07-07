@@ -15,6 +15,7 @@ ADMIN_USER="ci-admin"
 ADMIN_REAL_NAME="jane doe"
 ADMIN_PASS="joomla-17082005"
 ADMIN_EMAIL="admin@example.org"
+WORKSPACE_ROOT="/workspaces/gsoc25_weblinks"
 
 mysql -u root -e "CREATE DATABASE IF NOT EXISTS \`$DB_NAME\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 mysql -u root -e "CREATE USER IF NOT EXISTS '$DB_USER'@'localhost' IDENTIFIED BY '$DB_PASS';"
@@ -66,11 +67,11 @@ php $JOOMLA_ROOT/installation/joomla.php install --verbose \
 echo "--> Setting Joomla to debug mode..."
 php -d error_reporting=0 $JOOMLA_ROOT/cli/joomla.php config:set debug=true error_reporting=maximum
 
-WEBLINKS_PKG_PATH="${containerWorkspaceFolder}/dist/pkg-weblinks-current.zip"
+WEBLINKS_PKG_PATH="${WORKSPACE_ROOT}/dist/pkg-weblinks-current.zip"
 echo "--> Installing Weblinks extension from $WEBLINKS_PKG_PATH..."
 if [ -f "$WEBLINKS_PKG_PATH" ]; then
     php $JOOMLA_ROOT/cli/joomla.php extension:install --path="$WEBLINKS_PKG_PATH"
-    cd $containerWorkspaceFolder
+    cd $WORKSPACE_ROOT
     vendor/bin/robo map /var/www/joomla
 else
     echo "Weblink package not found at $WEBLINKS_PKG_PATH. Skipping installation."
@@ -89,22 +90,6 @@ sed -i "/\['AllowNoPassword'\] = false/a \$cfg['Servers'][\$i]['host'] = '127.0.
 sed -i "s/\['AllowNoPassword'\] = false/\['AllowNoPassword'\] = true/" $PMA_ROOT/config.inc.php
 
 # --- 7. Finalize Permissions and Restart Apache ---
-echo "--> Configuring .htaccess for Codespaces reverse proxy..."
-
-# Rename htaccess.txt to .htaccess to enable custom rules
-mv $JOOMLA_ROOT/htaccess.txt $JOOMLA_ROOT/.htaccess
-
-# Define the rules to be added
-HTACCESS_RULES="<IfModule mod_rewrite.c>\\n  RewriteEngine On\\n  RewriteCond %{HTTP:X-Forwarded-Proto} =https\\n  RewriteRule .* - [E=HTTPS:on]\\n</IfModule>"
-
-# Use sed to insert the rules at the very beginning of the .htaccess file
-sed -i "1s;^;${HTACCESS_RULES}\\n;" $JOOMLA_ROOT/.htaccess
-
-echo "--> Enabling SEF Rewrite to use .htaccess..."
-# Use the Joomla CLI to enable the 'sef_rewrite' option
-php $JOOMLA_ROOT/cli/joomla.php config:set sef_rewrite=true
-
-# Now, continue with your original permission settings
 echo "--> Setting final ownership and permissions..."
 chown -R www-data:www-data $JOOMLA_ROOT
 
@@ -116,7 +101,7 @@ echo "--> Restarting Apache..."
 service apache2 restart
 
 # --- 8. Display and Save Login Credentials ---
-CREDENTIALS_FILE="${containerWorkspaceFolder}/login-credentials.txt"
+CREDENTIALS_FILE="${WORKSPACE_ROOT}/login-credentials.txt"
 {
     echo ""
     echo "---"
